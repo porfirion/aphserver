@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 	//"net/url"
-	"time"
+	//"time"
 )
 
 const (
@@ -20,7 +20,9 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-var connections map[string]*Connection = make(map[string]*Connection)
+var incoming chan []byte = make(chan []byte)
+
+var connections []*Connection = make([]*Connection, 1)
 
 func indexHandler(rw http.ResponseWriter, request *http.Request) {
 	var indexTempl = template.Must(template.ParseFiles("templates/index.html"))
@@ -38,15 +40,27 @@ func wsHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn := NewConnection(ws)
+	conn := NewConnection(ws, incoming)
 
-	timestamp := time.Now().Format("01-01-2011 00:00:00")
+	n := len(connections)
+	connections = connections[0 : n+1]
+	connections[n] = conn
 
-	fmt.Println(timestamp)
-	connections[timestamp] = conn
+}
+
+func logic() {
+	for {
+		var message []byte = <-incoming
+		fmt.Println(string(message))
+		for _, conn := range connections {
+			conn.input <- message
+		}
+	}
 }
 
 func main() {
+	go logic()
+
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/ws", wsHandler)
 
