@@ -28,4 +28,6 @@ jQuery(document).ready(function() {
 	websocket.onopen = onopenHandler;
 	websocket.onclose = oncloseHandler;
 	websocket.onmessage = onmessageHandler;
+
+
 });

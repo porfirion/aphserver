@@ -22,7 +22,7 @@ var upgrader = websocket.Upgrader{
 
 var incoming chan []byte = make(chan []byte)
 
-var connections []*Connection = make([]*Connection, 1)
+var connections []*Connection = make([]*Connection, 0, 10)
 
 func indexHandler(rw http.ResponseWriter, request *http.Request) {
 	var indexTempl = template.Must(template.ParseFiles("templates/index.html"))
@@ -42,15 +42,21 @@ func wsHandler(rw http.ResponseWriter, r *http.Request) {
 
 	conn := NewConnection(ws, incoming)
 
+	if len(connections) == cap(connections) {
+		newConnections := make([]*Connection, len(connections), len(connections)+10)
+		copy(newConnections, connections)
+		connections = newConnections
+	}
+
 	n := len(connections)
+
 	connections = connections[0 : n+1]
 	connections[n] = conn
-
 }
 
 func logic() {
 	for {
-		var message []byte = <-incoming
+		message := <-incoming
 		fmt.Println(string(message))
 		for _, conn := range connections {
 			conn.input <- message
