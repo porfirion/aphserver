@@ -2,14 +2,55 @@ package main
 
 import (
 	"encoding/json"
-	"io"
+	//"io"
 	"log"
 )
 
-type Message struct {
-	Type, Data string
+const (
+	MessageTypeJoin  = 1
+	MessageTypeLeave = 2
+	MessageTypeText  = 3
+
+	MessageTypeSynchMembers = 101
+)
+
+type MessageInterface interface {
 }
 
+type Message struct {
+	Type int
+	Uuid string
+}
+
+func StringifyMessage(msg MessageInterface) []byte {
+	if bytes, err := json.Marshal(msg); err == nil {
+		return bytes
+
+	} else {
+		log.Fatal(err)
+		return nil
+	}
+}
+
+type JoinMessage struct {
+	Message
+}
+
+type LeaveMessage struct {
+	Message
+}
+
+type TextMessage struct {
+	Message
+	Text string
+}
+
+type SynchMembersMessage struct {
+	Message
+	Members []string
+}
+
+/*
 func ReadMessage(buffer []byte) *Message {
 	var message *Message
 	if err := json.Unmarshal(buffer, message); err != nil && err != io.EOF {
@@ -28,3 +69,4 @@ func WriteMessage(msg *Message) []byte {
 
 	return bytes
 }
+*/

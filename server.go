@@ -20,9 +20,10 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-var incoming chan []byte = make(chan []byte)
+var incomingMessages chan MessageInterface = make(chan MessageInterface)
+var incomingConnections chan *Connection = make(chan *Connection)
 
-var connections []*Connection = make([]*Connection, 0, 10)
+var connections map[string]*Connection = make(map[string]*Connection)
 
 func indexHandler(rw http.ResponseWriter, request *http.Request) {
 	var indexTempl = template.Must(template.ParseFiles("templates/index.html"))
@@ -40,26 +41,47 @@ func wsHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn := NewConnection(ws, incoming)
+	conn := NewConnection(ws, incomingMessages)
 
-	if len(connections) == cap(connections) {
-		newConnections := make([]*Connection, len(connections), len(connections)+10)
-		copy(newConnections, connections)
-		connections = newConnections
+	incomingConnections <- conn
+}
+
+func SendAll(msg MessageInterface) {
+	for _, conn := range connections {
+		conn.input <- msg
 	}
-
-	n := len(connections)
-
-	connections = connections[0 : n+1]
-	connections[n] = conn
 }
 
 func logic() {
 	for {
-		message := <-incoming
-		fmt.Println(string(message))
-		for _, conn := range connections {
-			conn.input <- message
+		select {
+		case msg := <-incomingMessages:
+			fmt.Println(StringifyMessage(msg))
+
+			if leaveMsg, ok := msg.(*LeaveMessage); ok {
+				//connections[leaveMsg.Uuid].ws.Close()
+				delete(connections, leaveMsg.Uuid)
+				log.Println(leaveMsg.Uuid + " leaved!")
+			}
+
+			SendAll(msg)
+
+		case conn := <-incomingConnections:
+			connections[conn.uuid] = conn
+
+			msg := &JoinMessage{Message{MessageTypeJoin, conn.uuid}}
+
+			log.Println("Connected: " + conn.uuid)
+
+			SendAll(msg)
+			var membersUuids []string = make([]string, len(connections))
+			var i int = 0
+			for uuid, _ := range connections {
+				membersUuids[i] = uuid
+				i++
+			}
+
+			conn.input <- &SynchMembersMessage{Message{MessageTypeSynchMembers, conn.uuid}, membersUuids}
 		}
 	}
 }

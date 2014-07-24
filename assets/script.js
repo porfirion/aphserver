@@ -1,3 +1,11 @@
+MessageTypeJoin  = 1;
+MessageTypeLeave = 2;
+MessageTypeText  = 3;
+
+MessageTypeSynchMembers  = 101;
+
+var members = {};
+
 function generateUUID(){
 	var d = new Date().getTime();
 	var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -18,7 +26,60 @@ function oncloseHandler() {
 
 }
 function onmessageHandler(event) {
-	$('body').append('<p>' + event.data + '</p>');
+	var data = JSON.parse(event.data);
+	if (data.Type == MessageTypeJoin) {
+		ShowMessage(data.Uuid + " joined!", "join");
+		NewMember(data.Uuid)
+	}
+	else if (data.Type == MessageTypeLeave) {
+		if (data.Uuid in members) {
+			members[data.Uuid].anchor.remove();	
+			delete(members[data.Uuid]);
+		}
+
+		ShowMessage(data.Uuid + ' leaved!', 'leave');
+	}
+	else if (data.Type == MessageTypeSynchMembers) {
+		ShowMessage('Synchronizing members...');
+		for (var i = 0; i < data.Members.length; i++) {
+			NewMember(data.Members[i]);
+		}
+	}
+	else if (data.Type == MessageTypeText) {
+		if (data.Uuid == uuid) {
+			ShowMessage(" me: \"" + data.Text + "\"", "me");
+		}
+		else {
+			ShowMessage(data.Uuid + " says: \"" + data.Text + "\"");
+		}
+	}
+	else {
+		ShowMessage(event.data);
+	}
+}
+
+function NewMember(uuid) {
+	if (!(uuid in members)) {
+		var member = {
+			uuid: uuid,
+			anchor: $('<div class="member">'+uuid+'</div>'),
+		};
+		$('.chat_members').append(member.anchor);
+		members[uuid] = member;
+
+		return member;
+	}
+	else {
+		return members[uuid];
+	}
+}
+
+function ShowMessage(text, messageType) {
+	if (typeof messageType == 'undefined' || messageType == null) {
+		messageType = "";
+	}
+
+	$('.chat_window').append('<div class="message ' + messageType + '">' + text + '</div>');
 }
 
 jQuery(document).ready(function() {
@@ -29,5 +90,10 @@ jQuery(document).ready(function() {
 	websocket.onclose = oncloseHandler;
 	websocket.onmessage = onmessageHandler;
 
+	$('#chat_form').submit(function(event) {
+		event.preventDefault();
 
+		websocket.send($('.chat_input').val());
+		$('.chat_input').val('');
+	})
 });
