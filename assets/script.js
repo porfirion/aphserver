@@ -23,7 +23,7 @@ function onopenHandler() {
 	websocket.send(uuid);
 }
 function oncloseHandler() {
-
+	ShowMessage("server is down", "error");
 }
 function onmessageHandler(event) {
 	var data = JSON.parse(event.data);
@@ -85,7 +85,7 @@ function ShowMessage(text, messageType) {
 jQuery(document).ready(function() {
 	uuid = generateUUID();
 	$('h1').html(uuid);
-	websocket = new WebSocket("ws://localhost:8080/ws");
+	websocket = new WebSocket("ws://" + window.location.host + "/ws");
 	websocket.onopen = onopenHandler;
 	websocket.onclose = oncloseHandler;
 	websocket.onmessage = onmessageHandler;
