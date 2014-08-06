@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	//"sync"
 	//"net/url"
 	//"time"
 )
@@ -20,10 +21,10 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-var incomingMessages chan MessageInterface = make(chan MessageInterface)
+var incomingMessages chan MessageInterface = make(chan MessageInterface, 100)
 var incomingConnections chan *Connection = make(chan *Connection)
 
-var connections map[string]*Connection = make(map[string]*Connection)
+var connectionsManager ConnectionsManager = NewConnectionsManager()
 
 func indexHandler(rw http.ResponseWriter, request *http.Request) {
 	var indexTempl = template.Must(template.ParseFiles("templates/index.html"))
@@ -46,9 +47,13 @@ func wsHandler(rw http.ResponseWriter, r *http.Request) {
 	incomingConnections <- conn
 }
 
+func Send(uuid string, msg MessageInterface) {
+	connectionsManager.GetConnectionByUUID(uuid).ws.WriteMessage(websocket.TextMessage, StringifyMessage(msg))
+}
+
 func SendAll(msg MessageInterface) {
-	for _, conn := range connections {
-		conn.input <- msg
+	for _, conn := range connectionsManager.connections {
+		conn.ws.WriteMessage(websocket.TextMessage, StringifyMessage(msg))
 	}
 }
 
@@ -59,29 +64,21 @@ func logic() {
 			fmt.Println(StringifyMessage(msg))
 
 			if leaveMsg, ok := msg.(*LeaveMessage); ok {
-				//connections[leaveMsg.Uuid].ws.Close()
-				delete(connections, leaveMsg.Uuid)
-				log.Println(leaveMsg.Uuid + " leaved!")
+				connectionsManager.RemoveConnectionByUUID(leaveMsg.Uuid)
 			}
 
 			SendAll(msg)
 
 		case conn := <-incomingConnections:
-			connections[conn.uuid] = conn
+			log.Println("Connected: " + conn.uuid)
+			connectionsManager.AddConnection(conn)
 
 			msg := &JoinMessage{Message{MessageTypeJoin, conn.uuid}}
 
-			log.Println("Connected: " + conn.uuid)
-
 			SendAll(msg)
-			var membersUuids []string = make([]string, len(connections))
-			var i int = 0
-			for uuid, _ := range connections {
-				membersUuids[i] = uuid
-				i++
-			}
+			membersUuids := connectionsManager.GetConnectionsUUIDs()
 
-			conn.input <- &SynchMembersMessage{Message{MessageTypeSynchMembers, conn.uuid}, membersUuids}
+			Send(conn.uuid, SynchMembersMessage{Message{MessageTypeSynchMembers, conn.uuid}, membersUuids})
 		}
 	}
 }
