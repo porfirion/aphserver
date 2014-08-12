@@ -42,9 +42,12 @@ func wsHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn := NewConnection(ws, incomingMessages)
-
-	incomingConnections <- conn
+	if conn, err := NewConnection(ws, incomingMessages); err != nil {
+		log.Println("error on connection: ", err)
+		return
+	} else {
+		incomingConnections <- conn
+	}
 }
 
 func Send(uuid string, msg MessageInterface) {
@@ -63,22 +66,23 @@ func logic() {
 		case msg := <-incomingMessages:
 			fmt.Println(StringifyMessage(msg))
 
-			if leaveMsg, ok := msg.(*LeaveMessage); ok {
-				connectionsManager.RemoveConnectionByUUID(leaveMsg.Uuid)
+			switch thisMsg := msg.(type) {
+			case *LeaveMessage:
+				connectionsManager.RemoveConnectionByUUID(thisMsg.UUID)
+			default:
+				SendAll(thisMsg)
 			}
-
-			SendAll(msg)
 
 		case conn := <-incomingConnections:
 			log.Println("Connected: " + conn.uuid)
 			connectionsManager.AddConnection(conn)
 
-			msg := &JoinMessage{Message{MessageTypeJoin, conn.uuid}}
+			msg := &JoinMessage{conn.uuid}
 
 			SendAll(msg)
 			membersUuids := connectionsManager.GetConnectionsUUIDs()
 
-			Send(conn.uuid, SynchMembersMessage{Message{MessageTypeSynchMembers, conn.uuid}, membersUuids})
+			Send(conn.uuid, SynchMembersMessage{membersUuids})
 		}
 	}
 }

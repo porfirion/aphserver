@@ -1,6 +1,7 @@
-MessageTypeJoin  = 1;
-MessageTypeLeave = 2;
-MessageTypeText  = 3;
+MessageTypeLogin = 1;
+MessageTypeJoin  = 2;
+MessageTypeLeave = 3;
+MessageTypeText  = 4;
 
 MessageTypeSynchMembers  = 101;
 
@@ -20,7 +21,14 @@ var websocket;
 var uuid;
 
 function onopenHandler() {
-	websocket.send(uuid);
+	var msg = {
+		MessageType: MessageTypeLogin,
+		Data: JSON.stringify({
+			UUID: uuid
+		})
+	}
+	websocket.send(JSON.stringify(msg))
+	//websocket.send(uuid);
 }
 function oncloseHandler() {
 	ShowMessage("server is down", "error");
@@ -82,6 +90,14 @@ function ShowMessage(text, messageType) {
 	$('.chat_window').append('<div class="message ' + messageType + '">' + text + '</div>');
 }
 
+function SendMessage(type, data) {
+	var msg = {
+		MessageType: type,
+		Data: JSON.stringify(data)
+	}
+	websocket.send(JSON.stringify(msg))
+}
+
 jQuery(document).ready(function() {
 	uuid = generateUUID();
 	$('h1').html(uuid);
@@ -93,7 +109,7 @@ jQuery(document).ready(function() {
 	$('#chat_form').submit(function(event) {
 		event.preventDefault();
 
-		websocket.send($('.chat_input').val());
+		SendMessage(MessageTypeText, {Text: $('.chat_input').val()});
 		$('.chat_input').val('');
 	})
 });
