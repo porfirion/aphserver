@@ -2,9 +2,9 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"github.com/gorilla/websocket"
-	//"log"
+	"io"
+	"log"
 )
 
 type Connection struct {
@@ -21,22 +21,22 @@ func (conn *Connection) reader() {
 	}()
 
 	for {
-		if _, data, err := conn.ws.ReadMessage(); err != nil {
-			fmt.Println("error while reading: ", err)
+		if _, data, err := conn.ws.ReadMessage(); err == io.EOF {
+			// client disconnected
+			break
+		} else if err != nil {
+			log.Println("error while reading: ", err)
 			break
 		} else {
 			if msg, err := ParseMessage(data); err != nil {
-				fmt.Println("error while parsing: ", err)
+				log.Println("error while parsing: ", err)
 				break
 			} else {
-				// fmt.Println("Message: " + string(data))
-				// msg := &TextMessage{Message{MessageTypeText, conn.uuid}, string(data)}
-
 				conn.output <- msg
 			}
 		}
 	}
-	fmt.Println("Closing websocket " + conn.ws.RemoteAddr().String())
+	//log.Println("Closing websocket " + conn.ws.RemoteAddr().String())
 }
 
 func NewConnection(soc *websocket.Conn, output chan MessageInterface) (*Connection, error) {

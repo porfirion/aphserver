@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"sync"
 )
 
@@ -28,16 +27,16 @@ func (manager *ConnectionsManager) GetCurrentIndex() uint64 {
 	return manager.currentIndex
 }
 
-func (manager *ConnectionsManager) AddConnection(conn *Connection) {
+func (manager *ConnectionsManager) AddConnection(conn *Connection) uint64 {
 	conn.id = manager.GenerateIndex()
 	manager.connections[conn.id] = conn
 	manager.namedConnections[conn.uuid] = conn.id
+	return conn.id
 }
 
 func (manager *ConnectionsManager) RemoveConnection(ind uint64) {
-	conn := manager.connections[ind]
+	//conn := manager.connections[ind]
 	delete(manager.connections, ind)
-	log.Println(conn.uuid + " leaved!")
 }
 
 func (manager *ConnectionsManager) RemoveConnectionByUUID(uuid string) {

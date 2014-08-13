@@ -7,60 +7,71 @@ import (
 )
 
 const (
-	MessageTypeLogin = 1
-	MessageTypeJoin  = 2
-	MessageTypeLeave = 3
-	MessageTypeText  = 4
+	MessageTypeLogin     = 1
+	MessageTypeWelcome   = 2
+	MessageTypeForbidden = 3
+	MessageTypeJoin      = 10
+	MessageTypeLeave     = 11
 
-	MessageTypeSynchMembers = 101
+	MessageTypeSyncMembers = 101
+
+	MessageTypeText = 1001
 )
 
 type MessageInterface interface {
 	GetType() int
 }
 
-type Message struct {
-	Type int
-	Uuid string
+func CreateMessageByType(msgType int) (MessageInterface, error) {
+	var msg MessageInterface = nil
+
+	switch msgType {
+	case MessageTypeLogin:
+		msg = &LoginMessage{}
+	case MessageTypeWelcome:
+		msg = &WelcomeMessage{}
+	case MessageTypeForbidden:
+		msg = &ForbiddenMessage{}
+	case MessageTypeJoin:
+		msg = &JoinMessage{}
+	case MessageTypeLeave:
+		msg = &LeaveMessage{}
+	case MessageTypeText:
+		msg = &TextMessage{}
+	default:
+		log.Println("Unknown message type (create): ", msgType)
+		return nil, errors.New("Unkwon message type (create)")
+	}
+
+	return msg, nil
 }
 
-func StringifyMessage(msg MessageInterface) []byte {
-	if bytes, err := json.Marshal(msg); err == nil {
-		return bytes
-
-	} else {
+func StringifyMessage(msg MessageInterface) ([]byte, error) {
+	bytes, err := json.Marshal(msg)
+	if err != nil {
 		log.Fatal(err)
-		return nil
+		return nil, err
+	}
+
+	wrapper := &MessageTransportWrapper{msg.GetType(), string(bytes)}
+
+	if bytes, err := json.Marshal(wrapper); err == nil {
+		return bytes, nil
+	} else {
+		return nil, err
 	}
 }
 
 func ParseMessage(data []byte) (MessageInterface, error) {
-	var wrapper *MessageWrapper = &MessageWrapper{}
+	var wrapper *MessageTransportWrapper = &MessageTransportWrapper{}
 	if err := json.Unmarshal(data, wrapper); err != nil {
 		log.Println("error: ", err)
 		return nil, err
 	}
 
-	//log.Println("data: ", wrapper)
-
-	var msg MessageInterface = nil
-
-	switch wrapper.MessageType {
-	case MessageTypeLogin:
-		//log.Println("login message")
-		msg = &LoginMessage{}
-	case MessageTypeJoin:
-		//log.Println("join message")
-		msg = &JoinMessage{}
-	case MessageTypeLeave:
-		//log.Println("leave message")
-		msg = &LeaveMessage{}
-	case MessageTypeText:
-		//log.Println("text message")
-		msg = &TextMessage{}
-	default:
-		//log.Println("unknown message type: ", wrapper.MessageType)
-		return nil, errors.New("unkwon message type")
+	msg, err := CreateMessageByType(wrapper.MessageType)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := json.Unmarshal([]byte(wrapper.Data), msg); err != nil {
@@ -69,51 +80,59 @@ func ParseMessage(data []byte) (MessageInterface, error) {
 	return msg, nil
 }
 
-type MessageWrapper struct {
+type MessageTransportWrapper struct {
 	MessageType int
 	Data        string
 }
 
-func (msg MessageWrapper) GetData() string {
-	return msg.Data
-}
-
 type LoginMessage struct {
 	UUID string
+	Name string
 }
 
-func (msg LoginMessage) GetType() int {
-	return MessageTypeLogin
+type WelcomeMessage struct {
+	Id uint64
+}
+
+type ForbiddenMessage struct {
+	Cause string
 }
 
 type JoinMessage struct {
 	UUID string
-}
-
-func (msg JoinMessage) GetType() int {
-	return MessageTypeJoin
+	Id   uint64
 }
 
 type LeaveMessage struct {
 	UUID string
 }
 
-func (msg LeaveMessage) GetType() int {
-	return MessageTypeLeave
-}
-
 type TextMessage struct {
 	Text string
 }
 
-func (msg TextMessage) GetType() int {
-	return MessageTypeText
-}
-
-type SynchMembersMessage struct {
+type SyncMembersMessage struct {
 	Members []string
 }
 
-func (msg SynchMembersMessage) GetType() int {
-	return MessageTypeSynchMembers
+func (msg LoginMessage) GetType() int {
+	return MessageTypeLogin
+}
+func (msg WelcomeMessage) GetType() int {
+	return MessageTypeWelcome
+}
+func (msg ForbiddenMessage) GetType() int {
+	return MessageTypeForbidden
+}
+func (msg JoinMessage) GetType() int {
+	return MessageTypeJoin
+}
+func (msg LeaveMessage) GetType() int {
+	return MessageTypeLeave
+}
+func (msg TextMessage) GetType() int {
+	return MessageTypeText
+}
+func (msg SyncMembersMessage) GetType() int {
+	return MessageTypeSyncMembers
 }

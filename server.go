@@ -1,14 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gorilla/websocket"
 	"html/template"
 	"log"
 	"net/http"
-	//"sync"
-	//"net/url"
-	//"time"
 )
 
 const (
@@ -43,7 +39,7 @@ func wsHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if conn, err := NewConnection(ws, incomingMessages); err != nil {
-		log.Println("error on connection: ", err)
+		log.Println("Error on connection: ", err)
 		return
 	} else {
 		incomingConnections <- conn
@@ -51,38 +47,60 @@ func wsHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 func Send(uuid string, msg MessageInterface) {
-	connectionsManager.GetConnectionByUUID(uuid).ws.WriteMessage(websocket.TextMessage, StringifyMessage(msg))
+	if data, err := StringifyMessage(msg); err == nil {
+		connectionsManager.GetConnectionByUUID(uuid).ws.WriteMessage(websocket.TextMessage, data)
+	}
 }
 
 func SendAll(msg MessageInterface) {
-	for _, conn := range connectionsManager.connections {
-		conn.ws.WriteMessage(websocket.TextMessage, StringifyMessage(msg))
+	if data, err := StringifyMessage(msg); err == nil {
+		for _, conn := range connectionsManager.connections {
+			conn.ws.WriteMessage(websocket.TextMessage, data)
+		}
 	}
 }
+
+// func SendPrecise(targets []string, exclude []string, msg MessageInterface) error {
+// 	targets = sort.Strings(targets)
+// 	exclude = sort.String(exclude)
+
+// 	data, err := StringifyMessage(msg)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	if len(targets) == 1 {
+// 		// personal message
+// 		conn := connectionsManager.GetConnectionByUUID(targets[0])
+// 		conn.ws.WriteMessage(websocket.TextMessage, data)
+// 	} else {
+
+// 	}
+// }
 
 func logic() {
 	for {
 		select {
 		case msg := <-incomingMessages:
-			fmt.Println(StringifyMessage(msg))
 
 			switch thisMsg := msg.(type) {
 			case *LeaveMessage:
 				connectionsManager.RemoveConnectionByUUID(thisMsg.UUID)
+				log.Println(thisMsg.UUID + " leaved")
+				SendAll(thisMsg)
 			default:
 				SendAll(thisMsg)
 			}
 
 		case conn := <-incomingConnections:
-			log.Println("Connected: " + conn.uuid)
-			connectionsManager.AddConnection(conn)
+			id := connectionsManager.AddConnection(conn)
+			Send(conn.uuid, &WelcomeMessage{id})
 
-			msg := &JoinMessage{conn.uuid}
+			log.Println(conn.uuid + " connected")
 
-			SendAll(msg)
-			membersUuids := connectionsManager.GetConnectionsUUIDs()
+			SendAll(&JoinMessage{conn.uuid, id})
 
-			Send(conn.uuid, SynchMembersMessage{membersUuids})
+			Send(conn.uuid, &SyncMembersMessage{connectionsManager.GetConnectionsUUIDs()})
 		}
 	}
 }

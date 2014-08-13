@@ -1,9 +1,12 @@
-MessageTypeLogin = 1;
-MessageTypeJoin  = 2;
-MessageTypeLeave = 3;
-MessageTypeText  = 4;
+MessageTypeLogin    = 1;
+MessageTypeWelcome  = 2;
+MessageTypeForbidden = 3;
+MessageTypeJoin     = 10;
+MessageTypeLeave    = 11;
 
-MessageTypeSynchMembers  = 101;
+MessageTypeSyncMembers = 101;
+
+MessageTypeText = 1001;
 
 var members = {};
 
@@ -28,37 +31,41 @@ function onopenHandler() {
 		})
 	}
 	websocket.send(JSON.stringify(msg))
-	//websocket.send(uuid);
 }
 function oncloseHandler() {
 	ShowMessage("server is down", "error");
 }
 function onmessageHandler(event) {
-	var data = JSON.parse(event.data);
-	if (data.Type == MessageTypeJoin) {
-		ShowMessage(data.Uuid + " joined!", "join");
-		NewMember(data.Uuid)
+	var wrapper = JSON.parse(event.data);
+	var data = JSON.parse(wrapper.Data);
+	window.console.log("msg type " + wrapper.MessageType, data);
+	if (wrapper.MessageType == MessageTypeWelcome) {
+		ShowMessage("WELCOME!")
 	}
-	else if (data.Type == MessageTypeLeave) {
-		if (data.Uuid in members) {
-			members[data.Uuid].anchor.remove();	
-			delete(members[data.Uuid]);
+	else if (wrapper.MessageType == MessageTypeJoin) {
+		ShowMessage(data.UUID + " joined!", "join");
+		NewMember(data.UUID)
+	}
+	else if (wrapper.MessageType == MessageTypeLeave) {
+		if (data.UUID in members) {
+			members[data.UUID].anchor.remove();	
+			delete(members[data.UUID]);
 		}
 
-		ShowMessage(data.Uuid + ' leaved!', 'leave');
+		ShowMessage(data.UUID + ' leaved!', 'leave');
 	}
-	else if (data.Type == MessageTypeSynchMembers) {
-		ShowMessage('Synchronizing members...');
+	else if (wrapper.MessageType == MessageTypeSyncMembers) {
+		window.console.log('Synchronizing members...');
 		for (var i = 0; i < data.Members.length; i++) {
 			NewMember(data.Members[i]);
 		}
 	}
-	else if (data.Type == MessageTypeText) {
-		if (data.Uuid == uuid) {
+	else if (wrapper.MessageType == MessageTypeText) {
+		if (data.UUID == uuid) {
 			ShowMessage(" me: \"" + data.Text + "\"", "me");
 		}
 		else {
-			ShowMessage(data.Uuid + " says: \"" + data.Text + "\"");
+			ShowMessage(data.UUID + " says: \"" + data.Text + "\"");
 		}
 	}
 	else {
